@@ -94,8 +94,9 @@ function getModuleAbortSignal(): AbortSignal {
 const SubagentParams = Type.Object({
   agent: Type.String({
     description:
-      "Which agent to spawn (e.g. 'worker', 'scout', 'researcher'). This loads the agent's " +
-      "role profile — its tool loadout and system prompt. Must be one of the available agents.",
+      "Which agent to spawn (e.g. 'worker', 'scout', 'researcher', 'advisor'). This loads the agent's " +
+      "role profile — its tool loadout and system prompt. Use agent: 'advisor' (not merely a name containing " +
+      "'advisor') for the research-only Astra advisor. Must be one of the available agents.",
   }),
   task: Type.String({ description: "Task/prompt for the sub-agent" }),
   name: Type.Optional(
@@ -108,7 +109,8 @@ const SubagentParams = Type.Object({
   model: Type.Optional(
     Type.String({
       description:
-        "Optional provider/model override. If omitted, the subagent inherits the main session's active model. " +
+        "Optional provider/model override for a model-neutral profile. If omitted, the subagent inherits " +
+        "the main session's active model. A model pinned by an agent profile (such as advisor) always wins. " +
         "Use a model available to the main session (shown by subagents_list or /model).",
     }),
   ),
@@ -1188,7 +1190,7 @@ async function launchSubagent(
   // profiles inherit the main session selection. This avoids silently routing
   // every role through a stale hard-coded provider/model.
   const parentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
-  const effectiveModel = params.model ?? agentDefs?.model ?? parentModel;
+  const effectiveModel = agentDefs?.model ?? params.model ?? parentModel;
   const effectiveTools = agentDefs?.tools;
   const effectiveSkills = agentDefs?.skills;
   const effectiveThinking = agentDefs?.thinking;
@@ -1704,6 +1706,7 @@ export default function subagentsExtension(pi: ExtensionAPI) {
         "When the sub-agent finishes, the harness AUTOMATICALLY delivers its result as a steer message that wakes you up and starts a new turn — you do not need to do anything to receive it. " +
         "DO NOT write polling loops, sleep/wait commands, tail/watch scripts, or repeatedly read session/log files to detect completion. DO NOT call subagents_list or any other tool to 'check' status. All of that is wasted work — the harness handles delivery for you. " +
         "DO NOT fabricate, assume, or summarize results after calling this tool. " +
+        "For the research-only Astra advisor, set agent to exactly 'advisor' and omit model; name is cosmetic and does not select a profile. " +
         "After spawning, either end your turn immediately, or work on other independent tasks (including spawning more subagents in parallel). The harness will wake you with the result when it is ready.",
       promptSnippet:
         "Spawn a sub-agent in a dedicated terminal multiplexer pane. " +
@@ -1711,6 +1714,7 @@ export default function subagentsExtension(pi: ExtensionAPI) {
         "When the sub-agent finishes, the harness AUTOMATICALLY delivers its result as a steer message that wakes you up and starts a new turn — you do not need to do anything to receive it. " +
         "DO NOT write polling loops, sleep/wait commands, tail/watch scripts, or repeatedly read session/log files to detect completion. DO NOT call subagents_list or any other tool to 'check' status. All of that is wasted work — the harness handles delivery for you. " +
         "DO NOT fabricate, assume, or summarize results after calling this tool. " +
+        "For the research-only Astra advisor, set agent to exactly 'advisor' and omit model; name is cosmetic and does not select a profile. " +
         "After spawning, either end your turn immediately, or work on other independent tasks (including spawning more subagents in parallel). The harness will wake you with the result when it is ready.",
       parameters: SubagentParams,
 
