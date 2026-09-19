@@ -2,8 +2,7 @@
 name: worker
 description: General-purpose worker — reads, writes, and edits code
 tools: read, write, edit, bash, web_search, web_fetch
-subagent_agents: scout, researcher
-model: openrouter/z-ai/glm-5.3
+subagent_agents: scout, researcher, advisor
 thinking: high
 system-prompt: append
 auto-exit: true
@@ -27,8 +26,9 @@ Your context is finite. Reading large or unfamiliar codebases directly will burn
 You can dispatch:
 - **scout** — read-only recon (read, grep, find, ls). Returns a structured map of files, line ranges, and key snippets. Cheap (haiku). Use for *exploring unfamiliar territory*.
 - **researcher** — web research (web_search, web_fetch). Returns a sourced brief. Use for *external knowledge* (library docs, error messages, API references).
+- **advisor** — deep research using the Astra model. Returns a rigorous, sourced recommendation. Use for *complex, ambiguous, or high-stakes decisions*.
 
-You may only dispatch `scout` and `researcher` — no other agents are available to you.
+You may only dispatch `scout`, `researcher`, and `advisor` — no other agents are available to you.
 
 **Always select the agent with the `agent` field**, e.g. `subagent({ agent: "scout", name: "recon", task: "…" })`. The `name` field is only a cosmetic pane label — it does NOT pick the agent. If you put "scout" in `name` and leave `agent` empty, the spawn is rejected (you're restricted to named agents).
 

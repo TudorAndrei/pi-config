@@ -20,3 +20,7 @@ The extension creates a sibling pane using `herdr pane split --current --no-focu
 Agent profiles can override bundled profiles from `.pi/agents/` or `~/.pi/agent/agents/`, matching the upstream extension.
 
 `config.json` controls the live status widget; set `status.enabled` to `false` to disable it.
+
+## Models
+
+Bundled role profiles are model-neutral: a subagent inherits the main session's active model unless the `subagent` call supplies `model`. `subagents_list` shows both the effective inherited model and the models currently available to the main session, so the main agent can choose an available override. A custom agent profile may still set `model:` to deliberately pin that role.

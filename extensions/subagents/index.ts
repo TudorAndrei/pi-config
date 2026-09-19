@@ -95,7 +95,7 @@ const SubagentParams = Type.Object({
   agent: Type.String({
     description:
       "Which agent to spawn (e.g. 'worker', 'scout', 'researcher'). This loads the agent's " +
-      "fixed profile — its model, tool loadout, and system prompt. Must be one of the available agents.",
+      "role profile — its tool loadout and system prompt. Must be one of the available agents.",
   }),
   task: Type.String({ description: "Task/prompt for the sub-agent" }),
   name: Type.Optional(
@@ -105,7 +105,13 @@ const SubagentParams = Type.Object({
         "Has no effect on which agent runs — use `agent` for that.",
     }),
   ),
-  model: Type.Optional(Type.String({ description: "Model override (overrides agent default)" })),
+  model: Type.Optional(
+    Type.String({
+      description:
+        "Optional provider/model override. If omitted, the subagent inherits the main session's active model. " +
+        "Use a model available to the main session (shown by subagents_list or /model).",
+    }),
+  ),
   cwd: Type.Optional(
     Type.String({
       description:
@@ -1167,14 +1173,22 @@ function startWidgetRefresh() {
  */
 async function launchSubagent(
   params: typeof SubagentParams.static,
-  ctx: { sessionManager: { getSessionFile(): string | null; getSessionId(): string; getSessionDir(): string }; cwd: string },
+  ctx: {
+    sessionManager: { getSessionFile(): string | null; getSessionId(): string; getSessionDir(): string };
+    cwd: string;
+    model?: { provider: string; id: string };
+  },
   options?: { surface?: string },
 ): Promise<RunningSubagent> {
   const startTime = Date.now();
   const id = Math.random().toString(16).slice(2, 10);
 
   const agentDefs = params.agent ? loadAgentDefaults(params.agent) : null;
-  const effectiveModel = params.model ?? agentDefs?.model;
+  // Profiles may pin a model for a specialist use case, but model-neutral
+  // profiles inherit the main session selection. This avoids silently routing
+  // every role through a stale hard-coded provider/model.
+  const parentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
+  const effectiveModel = params.model ?? agentDefs?.model ?? parentModel;
   const effectiveTools = agentDefs?.tools;
   const effectiveSkills = agentDefs?.skills;
   const effectiveThinking = agentDefs?.thinking;
@@ -1963,26 +1977,39 @@ export default function subagentsExtension(pi: ExtensionAPI) {
         "Project-local agents override global ones with the same name.",
       parameters: Type.Object({}),
 
-      async execute() {
+      async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
         const list = discoverAgentDefinitions().filter((agent) => !agent.disableModelInvocation);
+        const availableModels = (ctx.scopedModels.length > 0
+          ? ctx.scopedModels.map(({ model }) => model)
+          : ctx.modelRegistry.getAvailable()
+        ).map((model) => `${model.provider}/${model.id}`);
+        const activeModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
 
         if (list.length === 0) {
           return {
             content: [{ type: "text", text: "No subagent definitions found." }],
-            details: { agents: [] },
+            details: { agents: [], availableModels, activeModel },
           };
         }
 
         const lines = list.map((a) => {
           const badge = a.source === "project" ? " (project)" : "";
           const desc = a.description ? ` — ${a.description}` : "";
-          const model = a.model ? ` [${a.model}]` : "";
+          const model = a.model
+            ? ` [${a.model}]`
+            : activeModel
+              ? ` [inherits ${activeModel}]`
+              : " [inherits main-session model]";
           return `• ${a.name}${badge}${model}${desc}`;
         });
 
+        const modelLines = availableModels.length
+          ? ["", "Models available to this session:", ...availableModels.map((model) => `• ${model}`)]
+          : [];
+
         return {
-          content: [{ type: "text", text: lines.join("\n") }],
-          details: { agents: list },
+          content: [{ type: "text", text: [...lines, ...modelLines].join("\n") }],
+          details: { agents: list, availableModels, activeModel },
         };
       },
 
@@ -1995,7 +2022,11 @@ export default function subagentsExtension(pi: ExtensionAPI) {
         const lines = agents.map((a: any) => {
           const badge = a.source === "project" ? theme.fg("accent", " (project)") : "";
           const desc = a.description ? theme.fg("dim", ` — ${a.description}`) : "";
-          const model = a.model ? theme.fg("dim", ` [${a.model}]`) : "";
+          const model = a.model
+            ? theme.fg("dim", ` [${a.model}]`)
+            : details?.activeModel
+              ? theme.fg("dim", ` [inherits ${details.activeModel}]`)
+              : theme.fg("dim", " [inherits main-session model]");
           return `  ${theme.fg("toolTitle", theme.bold(a.name))}${badge}${model}${desc}`;
         });
         return new Text(lines.join("\n"), 0, 0);
