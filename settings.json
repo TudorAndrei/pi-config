@@ -5,13 +5,9 @@
   "hideThinkingBlock": true,
   "lastChangelogVersion": "1.1.0",
   "packages": [
-    "npm:pi-mcp-adapter",
     "npm:@narumitw/pi-goal",
     "npm:@plannotator/pi-extension",
     "npm:@ff-labs/pi-fff"
   ],
-  "theme": "dark",
-  "extensions": [
-    "-builtin:mcp"
-  ]
+  "theme": "dark"
 }
